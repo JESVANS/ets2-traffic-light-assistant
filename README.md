@@ -1,98 +1,99 @@
-# ETS2 红绿灯巡航辅助
+# ETS2 车窗红绿灯 HUD 巡航辅助
 
-读取本车前方最近红绿灯的**真实游戏数据**（灯态 + 剩余秒数），在游戏画面上叠加透明悬浮窗，提供：
+直接运行于《欧洲卡车模拟 2》(ETS2 1.62) 内部的 **原生 D3D11 车窗 3D 全息 HUD 插件 (`ets2_tl_hud.dll`)**：读取本车前方最近红绿灯的真实状态与剩余倒计时，以 3D 透视平面投射在驾驶室前挡风玻璃下沿（避开左侧 HUD GPS 导航），支持独占全屏与无边框模式，无需打开外部叠加窗口。
 
-- 🚦 **红绿灯状态**：红 / 红黄 / 绿 / 黄 / 黄闪，以及收费站、铁路道口的道闸状态
-- ⏱ **倒计时**：当前灯态还剩几秒（低于 5 秒时精确到 0.1 秒）
-- 📏 **到停车线的距离**、当前车速、道路限速
-- 🧭 **巡航建议**：保持车速通过 / 加速至 X km/h 通过 / 减速至 X km/h 绿波通过 / 减速停车 / 紧急制动
-- 🔔 **蜂鸣提醒**：需要停车或紧急制动时提醒
+## 核心特性
 
-适配游戏版本：**ETS2 1.62**
+- 🪟 **驾驶室 3D 车窗投影 (`window_3d`)**：固定于前挡风玻璃下沿偏中位置（默认避开左侧地图 HUD），转头看后视镜时随车窗真实透视位移；切换车外视角或暂停时自动隐藏。支持卡车与 **Coaches DLC 客车**（双层大巴/长途客车），切车自动重校准驾驶室基准点并支持**按车型独立保存**车窗微调位置（`[Vehicle.<id>]`）。
+- ⚡ **全屏/无边框通用**：通过 Hook 游戏 D3D11 `Present` 直接渲染进游戏画面，零窗口合成延迟、不占额外桌面焦点。
+- 🚦 **精简放大 HUD 界面**：
+  - 左侧放大三灯信号柱（带荧光光晕，支持红 / 红黄 / 绿 / 黄 / 黄闪及收费站/铁路道口道闸）
+  - 左上大号纯数字倒计时（< 5 秒精确到 0.1 秒）
+  - 右上大号停车线距离（`m`）
+  - 底部彩色状态竖条 + 放大单行巡航建议（保持车速 / 加速通过 / 绿波减速 / 减速停车 / 紧急制动）
+- 🔔 **危险蜂鸣提醒**：红/黄灯或道闸未开需要刹车时提示。
+- 🎛️ **游戏内实时热键微调**：按快捷键实时调整位置并自动写入 `ets2_tl_hud.ini`。
 
-## 工作原理（不需要截屏，资源占用极低）
+## 架构说明
 
 ```mermaid
 flowchart LR
-    G["ETS2 游戏进程"] --> A["ets2la_plugin.dll<br/>Local\ETS2LASemaphore<br/>附近红绿灯坐标/灯态/剩余时间"]
-    G --> B["scs-telemetry.dll<br/>Local\SCSTelemetry<br/>本车坐标/朝向/车速/限速"]
-    A --> P["本程序 (Python)<br/>挑选前方本向信号灯<br/>计算巡航建议"]
-    B --> P
-    P --> O["透明悬浮窗"]
+    G["ETS2 游戏进程 (D3D11)"] --> P["ets2la_plugin.dll<br/>Local\ETS2LASemaphore (红绿灯)<br/>Local\ETS2LACameraProps (相机与位姿)"]
+    G --> S["SCS Telemetry SDK<br/>位置 / 朝向 / 车速 / 限速"]
+    P --> H["ets2_tl_hud.dll (本插件)"]
+    S --> H
+    H --> R["3D 车窗透视投影 -> D3D11 BackBuffer"]
 ```
 
-- 红绿灯数据来自 ETS2LA 项目的 `ets2la_plugin.dll`（https://gitlab.com/ETS2LA/ets2la_plugin），它在游戏内部读取附近信号灯，并写入共享内存 `Local\ETS2LASemaphore`。
-- 本车数据来自 `scs-telemetry.dll`（官方 SDK 遥测插件）。
-- 本程序每秒只读取 10 次、每次不到 4 KB 的共享内存，CPU 占用几乎可以忽略。
+## 安装与部署
 
-## 安装
+1. 确保游戏插件目录 `Euro Truck Simulator 2\bin\win_x64\plugins\` 中已存在 **`ets2la_plugin.dll`**（1.62 版）。
+2. 双击或运行 **`native\install.bat`**（会自动读取 Steam 注册表与 `libraryfolders.vdf` 探测游戏路径，并在缺失 `plugins` 目录时自动创建）：
+   - 默认安装：`native\install.bat`（自动保留你已调好的 `ets2_tl_hud.ini`）
+   - 手动指定游戏目录：`native\install.bat "D:\Games\Euro Truck Simulator 2"`
+   - 常用参数：`--rebuild`（强制重新编译后安装）、`--reset-ini`（备份旧配置为 `.ini.bak` 并恢复默认配置）、`--uninstall`（卸载插件）、`--silent`（静默执行不暂停）、`--help`（查看全部选项）
+3. 启动游戏，在弹出「请求使用高级 SDK 特性」提示时点击 **确定** 即可。
 
-1. **游戏插件**（你的电脑上已安装，位于 `Euro Truck Simulator 2\bin\win_x64\plugins\`）：
-   - `ets2la_plugin.dll`
-   - `scs-telemetry.dll`
+> 若 `plugins\` 中仍留有旧版配置，也可在游戏内按 `Ctrl + F10` 重载。
 
-   如果以后被删除，可以通过 ETS2LA 安装程序重新安装，或从上面的仓库获取。游戏启动时会弹出「SDK 插件」提示，点「确定」即可。
-2. **Python 3.9+**，安装依赖：
-   ```
-   pip install -r requirements.txt
-   ```
-3. 游戏画面设置改为 **窗口化全屏 / 无边框窗口**（独占全屏下外部悬浮窗不可见）。
+## 游戏内微调热键
 
-## 使用
+仅在游戏窗口处于前台时生效，调节结果自动保存至 `ets2_tl_hud.ini`：
 
-| 操作 | 方法 |
-|---|---|
-| 启动 | 双击 `start.bat`，或运行 `python main.py` |
-| 无游戏时预览效果 | `python main.py --demo` |
-| 调整悬浮窗位置 | 右键托盘图标 →「解锁位置」→ 拖动 →「锁定位置并保存」 |
-| 退出 | 右键托盘图标 →「退出」 |
-| 诊断数据 | 游戏中停在红绿灯前，运行 `python probe.py` |
-
-所有参数都在 [config.ini](config.ini) 中，里面有中文注释。
-
-## 巡航建议逻辑
-
-设 d = 到停车线距离，v = 车速，t = 当前灯态剩余时间，到达时间 ETA = d / v：
-
-| 灯态 | 条件 | 建议 |
+| 快捷键 | 3D 车窗模式作用 | 2D 固定模式作用 |
 |---|---|---|
-| 绿灯 | ETA ≤ t | 保持车速通过 |
-| 绿灯 | 以 d/t 的速度能通过，且不超限速、所需加速度可达 | 加速至 d/t |
-| 绿灯 | 以上都不满足，且能安全停下 | 准备减速停车 |
-| 黄灯 | ETA ≤ t | 保持车速通过 |
-| 黄灯 | 停车所需减速度 v²/2d ≤ 最大减速度 | 减速停车 |
-| 红灯 | ETA ≥ 到绿灯的时间 | 保持车速，抵达时为绿灯 |
-| 红灯 | d / 到绿灯时间 ≥ 最低绿波速度 | 减速至该速度，绿波通过（不用停车） |
-| 红灯 | 否则 | 减速停车 / 紧急制动 |
+| `Ctrl + ← / →` | 左右偏移 `offset_x` (±0.010 m，按住 `Shift` 为 ±0.002 m) | 水平位置 `screen_x` |
+| `Ctrl + ↑ / ↓` | 上下偏移 `offset_y` (±0.010 m，按住 `Shift` 为 ±0.002 m) | 垂直位置 `screen_y` |
+| `Ctrl + PageUp / PageDown` | 前后景深 `offset_z` (±0.020 m) | 面板宽度 `screen_width` |
+| `Ctrl + F8` | 切换 `window_3d`（3D车窗） / `screen_2d`（2D固定） | 同左 |
+| `Ctrl + F9` | 开关演示预览模式（无红绿灯时可随时开启调整位置） | 同左 |
+| `Ctrl + F10` | 热重载 `ets2_tl_hud.ini` 并重新校准驾驶室基准点 | 同左 |
+| `Ctrl + F11` | 临时隐藏 / 显示 HUD | 同左 |
 
-## 常见问题
+## 绿框默认参数 (`native/ets2_tl_hud.ini`)
 
-**悬浮窗显示「未检测到 ets2la_plugin 红绿灯数据」**
-检查 `ets2la_plugin.dll` 是否在 plugins 目录、游戏启动时有没有被加载；插件版本必须与游戏版本对应（目录里的 `ets2la_1.62` 文件就是版本标记）。游戏更新后需要等 ETS2LA 发布新版插件。
+- `mode = window_3d`
+- `offset_x = 0.160`, `offset_y = -0.245`, `offset_z = -1.390`
+- `panel_width = 0.420`, `panel_height = 0.155`, `tilt_deg = 8.0`
+- `bg_opacity = 0.28`（设为 `0.0` 为纯文字无底框投影），`hud_alpha = 0.94`
 
-**选中的灯不对 / 一直显示「前方无红绿灯」**
-游戏中停在红绿灯前运行 `python probe.py`，查看每个信号灯的「纵向 / 横向 / 高差 / 朝向点积」：
-- 本方向的灯，朝向点积如果总是接近 +1（或总是接近 −1），可以把 `facing_mode` 设为 `1`（或 `-1`），排除对向的灯；
-- 灯态码和实际颜色对不上时，修改 `[StateCodes]`；
-- 坐标明显偏差 512 的整数倍时，检查 `sector_size`。
+## 从源码编译 (MinGW-w64)
 
-**倒计时与游戏不同步**
-`time_left` 由插件直接给出，等于游戏内部的计时；游戏暂停时悬浮窗会显示「游戏已暂停」。
+环境：`C:\mingw64\bin`（GCC/G++ 8.1+，含 Windows SDK `d3d11` / `d3dcompiler` / `gdiplus`）：
 
-## 文件结构
+```bat
+cd native
+build.bat
+```
+
+生成产物为 `native\dist\ets2_tl_hud.dll`（静态链接 C/C++ 运行时与 winpthread，仅依赖系统 DLL）。
+
+## 辅助脚本（Python）
+
+- **数据诊断工具** `probe.py`：在游戏中停在红绿灯前运行 `python probe.py`，查看共享内存里信号灯纵向/横向距离、状态码与选中结果，便于调优 `[Selection]` 或 `[StateCodes]`。
+- **桌面预览版** `main.py --demo`：已同步更新为精简放大样式，可在不开游戏时快速预览。
+
+## 目录结构
 
 ```
-main.py            主程序（悬浮窗 + 控制循环）
-probe.py           诊断工具
-config.ini         配置
-start.bat          一键启动
-src/shm.py         Windows 共享内存只读访问
-src/telemetry.py   读取本车遥测
-src/semaphores.py  解析红绿灯数据，挑选前方目标灯
-src/advisor.py     巡航建议算法
-src/sources.py     游戏数据源 / 演示数据源
-src/overlay.py     PyQt5 透明悬浮窗
+native/
+  src/
+    types.hpp          数据结构与配置定义
+    config.hpp/.cpp    UTF-8 INI 读写与就地保存（保留注释）
+    shm_reader.hpp/.cpp 命名共享内存读取（带节流自动重连）
+    logic.hpp/.cpp     信号灯解析、选灯与巡航建议
+    hud_math.hpp/.cpp  驾驶室基准自校准与 3D 车窗透视投影
+    hud_painter.hpp/.cpp GDI+ 760x280 预乘 Alpha 放大 HUD 渲染
+    d3d11_hook.hpp/.cpp MinHook D3D11 Present/ResizeBuffers 渲染管线
+    plugin_main.cpp    SCS Telemetry SDK 入口、热键与蜂鸣提醒
+    ets2_tl_hud.def    DLL 精确导出表
+  ets2_tl_hud.ini      默认配置文件
+  build.bat            MinGW-w64 编译脚本
+  install.bat          一键部署到 ETS2 plugins 目录
+  dist/ets2_tl_hud.dll 编译产物
+src/                   Python 辅助版源码
+probe.py               共享内存诊断工具
 ```
 
 > [!NOTE]
-> 本工具只读取数据、不修改游戏，也不会向游戏发送任何输入。多人联机（TruckersMP）对 SDK 插件的政策请自行确认。
+> 本插件仅只读访问游戏共享内存与遥测通道，不修改游戏内存，也不发送任何模拟输入。多人联机（TruckersMP）对 SDK 插件的限制请自行确认。

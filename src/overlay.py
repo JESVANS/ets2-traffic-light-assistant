@@ -195,8 +195,8 @@ class Overlay(QWidget):
     def _draw_lamp(self, p, phase):
         s = self.s
         p.setPen(Qt.NoPen)
-        p.setBrush(QColor(30, 32, 36))
-        p.drawRoundedRect(QRectF(12 * s, 10 * s, 46 * s, 130 * s), 10 * s, 10 * s)
+        p.setBrush(QColor(22, 26, 33, 210))
+        p.drawRoundedRect(QRectF(10 * s, 9 * s, 50 * s, 132 * s), 11 * s, 11 * s)
         blink_on = int(time.monotonic() * 2) % 2 == 0
         lit = {
             Phase.RED: {0}, Phase.RED_YELLOW: {0, 1}, Phase.YELLOW: {1},
@@ -205,10 +205,10 @@ class Overlay(QWidget):
             Phase.GATE_OPEN: {2},
         }.get(phase, set())
         for i, c in enumerate((RED, YELLOW, GREEN)):
-            rect = QRectF(18 * s, (16 + i * 41) * s, 34 * s, 34 * s)
+            rect = QRectF(17 * s, (15 + i * 42) * s, 36 * s, 36 * s)
             if i in lit:
                 glow = QColor(c)
-                glow.setAlpha(90)
+                glow.setAlpha(95)
                 p.setBrush(glow)
                 p.drawEllipse(rect.adjusted(-4 * s, -4 * s, 4 * s, 4 * s))
                 p.setBrush(c)
@@ -224,46 +224,38 @@ class Overlay(QWidget):
         self._draw_lamp(p, m.phase)
 
         color = PHASE_COLORS.get(m.phase, WHITE)
-        x0 = 72 * s
-        # 倒计时
+        x0 = 74 * s
+        # 倒计时（纯数字，无下方汉字说明）
         t = max(0.0, m.time_left)
         countdown = f"{t:.1f}" if t < 5 else f"{int(t + 0.999)}"
         show_timer = m.phase not in (Phase.FLASHING, Phase.GATE_OPEN, Phase.GATE_CLOSED) and t < 999
         p.setPen(color)
-        p.setFont(self._font(36, True))
         if show_timer:
-            p.drawText(QRectF(x0, -2 * s, 140 * s, 60 * s), Qt.AlignLeft | Qt.AlignVCenter, countdown)
-            p.setFont(self._font(11))
-            p.drawText(QRectF(x0, 56 * s, 150 * s, 22 * s), Qt.AlignLeft | Qt.AlignVCenter,
-                       f"{PHASE_NAMES.get(m.phase, '')} · 剩余秒数")
+            p.setFont(self._font(44, True))
+            p.drawText(QRectF(x0, 4 * s, 165 * s, 76 * s), Qt.AlignLeft | Qt.AlignVCenter, countdown)
         else:
-            p.setFont(self._font(22, True))
-            p.drawText(QRectF(x0, 8 * s, 150 * s, 60 * s), Qt.AlignLeft | Qt.AlignVCenter,
+            p.setFont(self._font(26, True))
+            p.drawText(QRectF(x0, 4 * s, 165 * s, 76 * s), Qt.AlignLeft | Qt.AlignVCenter,
                        PHASE_NAMES.get(m.phase, ""))
 
-        # 右侧：距离 / 车速
+        # 右侧：放大距离（去掉灰色车速/限速小字）
         xr = 220 * s
         p.setPen(WHITE)
-        p.setFont(self._font(20, True))
-        p.drawText(QRectF(xr, 6 * s, 150 * s, 36 * s), Qt.AlignRight | Qt.AlignVCenter,
+        p.setFont(self._font(30, True))
+        p.drawText(QRectF(xr, 4 * s, 146 * s, 76 * s), Qt.AlignRight | Qt.AlignVCenter,
                    f"{m.distance:.0f} m")
-        p.setPen(GREY)
-        p.setFont(self._font(10))
-        limit = f" / 限速 {m.limit_kmh:.0f}" if m.limit_kmh > 1 else ""
-        p.drawText(QRectF(xr - 40 * s, 42 * s, 190 * s, 22 * s), Qt.AlignRight | Qt.AlignVCenter,
-                   f"车速 {m.speed_kmh:.0f} km/h{limit}")
 
         # 分隔线
-        p.setPen(QPen(QColor(255, 255, 255, 40), 1))
-        p.drawLine(int(x0), int(82 * s), int(self.width() - 12 * s), int(82 * s))
+        p.setPen(QPen(QColor(255, 255, 255, 45), 1))
+        p.drawLine(int(x0), int(84 * s), int(self.width() - 14 * s), int(84 * s))
 
-        # 巡航建议
+        # 巡航建议（放大并保持空间协调）
         if m.advice:
             ac = LEVEL_COLORS.get(m.advice.level, WHITE)
             p.setPen(Qt.NoPen)
             p.setBrush(ac)
-            p.drawRoundedRect(QRectF(x0, 96 * s, 6 * s, 36 * s), 3 * s, 3 * s)
+            p.drawRoundedRect(QRectF(x0, 98 * s, 6 * s, 38 * s), 3 * s, 3 * s)
             p.setPen(ac)
-            p.setFont(self._font(15, True))
-            p.drawText(QRectF(x0 + 14 * s, 90 * s, self.width() - x0 - 26 * s, 48 * s),
+            p.setFont(self._font(17, True))
+            p.drawText(QRectF(x0 + 14 * s, 90 * s, self.width() - x0 - 26 * s, 52 * s),
                        Qt.AlignLeft | Qt.AlignVCenter | Qt.TextWordWrap, m.advice.text)

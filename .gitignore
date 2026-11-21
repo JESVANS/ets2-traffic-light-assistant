@@ -9,3 +9,8 @@ env/
 *.log
 .DS_Store
 Thumbs.db
+native/build/
+native/third_party/imgui/
+native/tests/*.exe
+native/tests/*.png
+*.o
